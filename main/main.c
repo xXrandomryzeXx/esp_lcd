@@ -35,12 +35,6 @@ typedef struct {
     uint8_t databytes; //No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
 } lcd_init_cmd_t;
 
-typedef enum {
-    LCD_TYPE_ILI = 1,
-    LCD_TYPE_ST,
-    LCD_TYPE_MAX,
-} type_lcd_t;
-
 DRAM_ATTR static const lcd_init_cmd_t ili_init_cmds[] = {
     /* Power contorl B, power control = 0, DC_ENA = 1 */
     {0xCF, {0x00, 0x83, 0X30}, 3},
@@ -151,29 +145,6 @@ void lcd_spi_pre_transfer_callback(spi_transaction_t *t)
 {
     int dc = (int)t->user;
     gpio_set_level(PIN_NUM_DC, dc);
-}
-
-uint32_t lcd_get_id(spi_device_handle_t spi)
-{
-    // When using SPI_TRANS_CS_KEEP_ACTIVE, bus must be locked/acquired
-    spi_device_acquire_bus(spi, portMAX_DELAY);
-
-    //get_id cmd
-    lcd_cmd(spi, 0x04, true);
-
-    spi_transaction_t t;
-    memset(&t, 0, sizeof(t));
-    t.length = 8 * 3;
-    t.flags = SPI_TRANS_USE_RXDATA;
-    t.user = (void*)1;
-
-    esp_err_t ret = spi_device_polling_transmit(spi, &t);
-    assert(ret == ESP_OK);
-
-    // Release bus
-    spi_device_release_bus(spi);
-
-    return *(uint32_t*)t.rx_data;
 }
 
 //Initialize the display
@@ -322,11 +293,7 @@ void app_main(void)
         .max_transfer_sz = PARALLEL_LINES * 320 * 2 + 8
     };
     spi_device_interface_config_t devcfg = {
-#ifdef CONFIG_LCD_OVERCLOCK
-        .clock_speed_hz = 26 * 1000 * 1000,     //Clock out at 26 MHz
-#else
         .clock_speed_hz = 10 * 1000 * 1000,     //Clock out at 10 MHz
-#endif
         .mode = 0,                              //SPI mode 0
         .spics_io_num = PIN_NUM_CS,             //CS pin
         .queue_size = 7,                        //We want to be able to queue 7 transactions at a time
